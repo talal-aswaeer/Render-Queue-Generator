@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Render Queue Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#16191d;            /* houdini network editor dark */
+    --panel:#1e2228;
+    --panel-2:#242a31;
+    --line:#343c45;
+    --text:#d8dde2;
+    --muted:#7f8a94;
+    --rs:#ff5533;            /* redshift ember */
+    --rs-dim:#b33a24;
+    --ok:#7fc97a;
+    --warn:#e8b84b;
+    --node-wire:#4a5560;
+    --radius:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',system-ui,sans-serif;font-size:15px;line-height:1.5}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+  .wrap{max-width:880px;margin:0 auto;padding:32px 20px 80px}
+
+  /* header styled like a ROP node header bar */
+  header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .node-badge{
+    width:44px;height:44px;border-radius:8px;flex:none;
+    background:linear-gradient(145deg,var(--rs),var(--rs-dim));
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:#1a0d09;
+    box-shadow:0 0 0 1px rgba(255,85,51,.35), 0 4px 18px rgba(255,85,51,.18);
+  }
+  h1{font-size:22px;font-weight:700;letter-spacing:.01em}
+  .sub{color:var(--muted);font-size:13.5px;margin-bottom:28px;margin-top:2px}
+  .sub .mono{color:var(--rs);font-size:12.5px}
+
+  fieldset{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:18px 18px 20px;margin-bottom:22px}
+  legend{padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+
+  label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px}
+  label:first-of-type{margin-top:0}
+  input[type=text]{
+    width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;
+    color:var(--text);padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12.5px;
+    outline:none;transition:border-color .15s;
+  }
+  input[type=text]:focus{border-color:var(--rs)}
+  input[type=text]::placeholder{color:#4d5761}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .hint .mono{color:#9aa5af}
+
+  /* jobs as chained node cards */
+  .queue{position:relative}
+  .job{
+    position:relative;background:var(--panel);border:1px solid var(--line);
+    border-left:4px solid var(--rs);border-radius:var(--radius);
+    padding:14px 16px 16px;margin-bottom:0;
+  }
+  .job + .wire{width:2px;height:20px;background:var(--node-wire);margin:0 auto}
+  .job-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .job-idx{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rs);letter-spacing:.1em}
+  .job-title{font-size:13px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+  .job-btns{display:flex;gap:6px}
+  .icon-btn{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
+    border-radius:4px;width:28px;height:28px;cursor:pointer;font-size:13px;line-height:1;
+    display:flex;align-items:center;justify-content:center;transition:all .12s;
+  }
+  .icon-btn:hover{color:var(--text);border-color:#4a5560}
+  .icon-btn.del:hover{color:#ff7a5e;border-color:var(--rs-dim)}
+  .icon-btn:focus-visible{outline:2px solid var(--rs);outline-offset:1px}
+
+  .add-job{
+    display:block;width:100%;margin-top:20px;padding:11px;cursor:pointer;
+    background:transparent;border:1px dashed var(--node-wire);border-radius:var(--radius);
+    color:var(--muted);font-family:'Space Grotesk',sans-serif;font-size:13.5px;transition:all .15s;
+  }
+  .add-job:hover{border-color:var(--rs);color:var(--rs)}
+  .add-job:focus-visible{outline:2px solid var(--rs);outline-offset:2px}
+
+  /* generate section */
+  .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
+  .btn{
+    padding:12px 22px;border-radius:5px;border:none;cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14.5px;transition:all .15s;
+  }
+  .btn:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+  .btn-primary{background:var(--rs);color:#1a0d09}
+  .btn-primary:hover{background:#ff6a4a;box-shadow:0 4px 16px rgba(255,85,51,.3)}
+  .btn-ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line)}
+  .btn-ghost:hover{border-color:#4a5560}
+
+  .problems{margin-top:14px;font-size:13px;display:none}
+  .problems.show{display:block}
+  .problems div{color:var(--warn);padding:3px 0}
+  .problems div::before{content:"⚠ ";}
+  .okmsg{margin-top:14px;font-size:13px;color:var(--ok);display:none}
+  .okmsg.show{display:block}
+
+  /* preview */
+  details{margin-top:26px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
+  summary{cursor:pointer;padding:12px 16px;font-size:13px;color:var(--muted);user-select:none}
+  summary:hover{color:var(--text)}
+  .preview-tabs{display:flex;gap:0;border-top:1px solid var(--line)}
+  .ptab{flex:none;padding:8px 18px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent}
+  .ptab.active{color:var(--rs);border-bottom-color:var(--rs)}
+  pre{
+    padding:16px;overflow:auto;max-height:420px;font-family:'JetBrains Mono',monospace;
+    font-size:11.5px;line-height:1.55;color:#b9c2cb;background:var(--bg);
+    border-radius:0 0 var(--radius) var(--radius);white-space:pre;
+  }
+
+  footer{margin-top:34px;color:var(--muted);font-size:12px;line-height:1.7}
+  footer .mono{color:#9aa5af;font-size:11.5px}
+
+  @media (max-width:560px){
+    .wrap{padding:20px 12px 60px}
+    .actions{flex-direction:column}
+    .btn{width:100%}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="node-badge">ROP</div>
+    <h1>Render Queue Generator</h1>
+  </header>
+  <p class="sub">Fill in the paths, get a ready-to-run <span class="mono">render_queue.py</span> + <span class="mono">start_render_queue.bat</span>. Save both into the folder you set below, then double-click the .bat on the render PC.</p>
+
+  <fieldset>
+    <legend>Machine setup</legend>
+
+    <label for="houVersion">Houdini version on the render PC</label>
+    <input type="text" id="houVersion" value="20.5.654" spellcheck="false">
+    <p class="hint">Check the folder name in <span class="mono">C:\Program Files\Side Effects Software\</span> — e.g. <span class="mono">Houdini 20.5.654</span> → enter <span class="mono">20.5.654</span></p>
+
+    <label for="scriptFolder">Folder where you will save these two files</label>
+    <input type="text" id="scriptFolder" value="D:\TALAL\260722_Jerash Jerash Festival IJordan" spellcheck="false">
+    <p class="hint">The .bat looks for the .py here, and the log file <span class="mono">render_queue_log.txt</span> is written here too.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Render queue — rendered top to bottom</legend>
+    <div class="queue" id="queue"></div>
+    <button class="add-job" id="addJob" type="button">+ Add hip file to queue</button>
+  </fieldset>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="dlBoth" type="button">Download .py + .bat</button>
+    <button class="btn btn-ghost" id="dlPy" type="button">Only .py</button>
+    <button class="btn btn-ghost" id="dlBat" type="button">Only .bat</button>
+  </div>
+  <div class="problems" id="problems"></div>
+  <div class="okmsg" id="okmsg">Files downloaded — move them to the folder above on the render PC.</div>
+
+  <details id="previewBox">
+    <summary>Preview generated files</summary>
+    <div class="preview-tabs">
+      <button class="ptab active" data-tab="py" type="button">render_queue.py</button>
+      <button class="ptab" data-tab="bat" type="button">start_render_queue.bat</button>
+    </div>
+    <pre id="previewPre"></pre>
+  </details>
+
+  <footer>
+    Reminders before an overnight run:<br>
+    · Do a 1–2 frame test render of one ROP through the queue first.<br>
+    · Check each ROP's output path — files from different scenes must not overwrite each other.<br>
+    · <span class="mono">.hipnc</span> (Apprentice) caps third-party renders at 1280×720 with a watermark; Indie files are <span class="mono">.hiplc</span>.
+  </footer>
+</div>
+
+<script>
+(function(){
+  var queueEl   = document.getElementById('queue');
+  var problems  = document.getElementById('problems');
+  var okmsg     = document.getElementById('okmsg');
+  var previewPre= document.getElementById('previewPre');
+  var previewBox= document.getElementById('previewBox');
+  var activeTab = 'py';
+
+  /* ---------------- job rows ---------------- */
+
+  function jobRow(hip, rops){
+    var d = document.createElement('div');
+    d.className = 'job';
+    d.innerHTML =
+      '<div class="job-head">' +
+        '<span class="job-idx"></span>' +
+        '<span class="job-title mono"></span>' +
+        '<span class="job-btns">' +
+          '<button class="icon-btn up"   type="button" title="Move up"   aria-label="Move up">▲</button>' +
+          '<button class="icon-btn down" type="button" title="Move down" aria-label="Move down">▼</button>' +
+          '<button class="icon-btn del"  type="button" title="Remove"    aria-label="Remove">✕</button>' +
+        '</span>' +
+      '</div>' +
+      '<label>Hip file full path</label>' +
+      '<input type="text" class="hip" spellcheck="false" placeholder="D:\\TALAL\\project\\SC01-HIP\\SC01.hipnc">' +
+      '<label>ROP node paths — separate several with commas</label>' +
+      '<input type="text" class="rops" spellcheck="false" placeholder="/out/Redshift_ROP1">';
+
+    d.querySelector('.hip').value  = hip  || '';
+    d.querySelector('.rops').value = rops || '/out/Redshift_ROP1';
+
+    d.querySelector('.del').addEventListener('click', function(){
+      if(queueEl.querySelectorAll('.job').length > 1){ removeRow(d); renumber(); }
+      else { d.querySelector('.hip').value=''; d.querySelector('.rops').value='/out/Redshift_ROP1'; renumber(); }
+    });
+    d.querySelector('.up').addEventListener('click', function(){ moveRow(d,-1); });
+    d.querySelector('.down').addEventListener('click', function(){ moveRow(d, 1); });
+    d.querySelector('.hip').addEventListener('input', renumber);
+    return d;
+  }
+
+  function rows(){ return Array.prototype.slice.call(queueEl.querySelectorAll('.job')); }
+
+  function rebuildWires(){
+    rows().forEach(function(r){
+      if(r.nextElementSibling && r.nextElementSibling.className==='wire') r.nextElementSibling.remove();
+    });
+    var rs = rows();
+    rs.forEach(function(r,i){
+      if(i < rs.length-1){
+        var w = document.createElement('div'); w.className='wire';
+        r.after(w);
+      }
+    });
+  }
+
+  function removeRow(r){
+    if(r.nextElementSibling && r.nextElementSibling.className==='wire') r.nextElementSibling.remove();
+    r.remove();
+    rebuildWires();
+  }
+
+  function moveRow(r, dir){
+    var rs = rows(); var i = rs.indexOf(r);
+    var j = i + dir;
+    if(j < 0 || j >= rs.length) return;
+    if(dir < 0) queueEl.insertBefore(r, rs[j]);
+    else        rs[j].after(r);
+    rebuildWires(); renumber();
+  }
+
+  function renumber(){
+    rows().forEach(function(r,i){
+      r.querySelector('.job-idx').textContent = pad(i+1);
+      var hip = r.querySelector('.hip').value.trim();
+      var name = hip ? hip.split('\\').pop() : 'untitled';
+      r.querySelector('.job-title').textContent = name;
+    });
+  }
+  function pad(n){ return (n<10?'0':'')+n; }
+
+  function addJob(hip, rops){
+    var r = jobRow(hip, rops);
+    queueEl.appendChild(r);
+    rebuildWires(); renumber();
+    return r;
+  }
+
+  /* seed with the current project */
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC01-HIP\\SC01.hipnc');
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Lower.hipnc');
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_PTS.hipnc');
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Upper.hipnc');
+
+  document.getElementById('addJob').addEventListener('click', function(){
+    var r = addJob('');
+    r.querySelector('.hip').focus();
+  });
+
+  /* ---------------- validation + collection ---------------- */
+
+  function clean(p){ return p.trim().replace(/[\\\/]+$/,''); }
+
+  function collect(){
+    var errs = [];
+    var version = document.getElementById('houVersion').value.trim();
+    var folder  = clean(document.getElementById('scriptFolder').value);
+
+    if(!version) errs.push('Houdini version is empty.');
+    if(!folder)  errs.push('Save folder is empty.');
+    if(folder && !/^[A-Za-z]:\\/.test(folder)) errs.push('Save folder should be a full Windows path like D:\\TALAL\\project');
+
+    var jobs = [];
+    rows().forEach(function(r,i){
+      var hip = clean(r.querySelector('.hip').value);
+      var ropsRaw = r.querySelector('.rops').value.trim();
+      if(!hip && !ropsRaw) return;                    // fully empty row: skip silently
+      if(!hip){ errs.push('Job '+pad(i+1)+': hip file path is empty.'); return; }
+      if(!/^[A-Za-z]:\\/.test(hip)) errs.push('Job '+pad(i+1)+': hip path should start with a drive letter, e.g. D:\\...');
+      if(!/\.(hip|hipnc|hiplc)$/i.test(hip)) errs.push('Job '+pad(i+1)+': path does not end in .hip / .hipnc / .hiplc');
+      if(/["']/.test(hip)) errs.push('Job '+pad(i+1)+': remove quote characters from the path.');
+
+      var rops = ropsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
+      if(!rops.length){ rops = ['/out/Redshift_ROP1']; }
+      rops.forEach(function(rp){
+        if(rp[0] !== '/') errs.push('Job '+pad(i+1)+': ROP path "'+rp+'" should start with /out/');
+      });
+      jobs.push({hip:hip, rops:rops});
+    });
+
+    if(!jobs.length) errs.push('The queue is empty — add at least one hip file.');
+    return {version:version, folder:folder, jobs:jobs, errs:errs};
+  }
+
+  /* ---------------- file generation ---------------- */
+
+  function buildPy(cfg){
+    var q = '';
+    cfg.jobs.forEach(function(j){
+      q += '    {\n';
+      q += '        "hip": r"' + j.hip + '",\n';
+      q += '        "rops": [\n';
+      j.rops.forEach(function(rp){ q += '            "' + rp + '",\n'; });
+      q += '        ],\n';
+      q += '    },\n';
+    });
+
+    return [
+'"""',
+'Houdini / Redshift multi-file render queue',
+'Generated by Render Queue Generator -- run via start_render_queue.bat',
+'"""',
+'',
+'import hou',
+'import time',
+'import traceback',
+'from datetime import datetime',
+'',
+'# ---------------------------------------------------------------',
+'# Render queue: each entry = one hip file + its ROPs,',
+'# rendered in the order listed.',
+'# ---------------------------------------------------------------',
+'QUEUE = [',
+q.replace(/\n$/,''),
+']',
+'',
+'LOG_FILE = r"' + cfg.folder + '\\render_queue_log.txt"',
+'',
+'# ---------------------------------------------------------------',
+'',
+'',
+'def log(msg):',
+'    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")',
+'    line = f"[{stamp}] {msg}"',
+'    print(line, flush=True)',
+'    try:',
+'        with open(LOG_FILE, "a", encoding="utf-8") as f:',
+'            f.write(line + "\\n")',
+'    except Exception:',
+'        pass  # never let logging kill the queue',
+'',
+'',
+'def fmt_duration(seconds):',
+'    m, s = divmod(int(seconds), 60)',
+'    h, m = divmod(m, 60)',
+'    return f"{h:02d}:{m:02d}:{s:02d}"',
+'',
+'',
+'def render_rop(rop_path):',
+'    rop = hou.node(rop_path)',
+'    if rop is None:',
+'        log(f"  SKIPPED (not found): {rop_path}")',
+'        return "missing"',
+'',
+'    log(f"  Rendering: {rop_path}")',
+'    t0 = time.time()',
+'    try:',
+'        rop.render(verbose=True, output_progress=True)',
+'        log(f"  DONE: {rop_path}  ({fmt_duration(time.time() - t0)})")',
+'        return "ok"',
+'    except hou.OperationFailed as e:',
+'        log(f"  FAILED: {rop_path} -> {e}")',
+'        return "failed"',
+'    except Exception:',
+'        log(f"  FAILED (unexpected): {rop_path}")',
+'        log(traceback.format_exc())',
+'        return "failed"',
+'',
+'',
+'def main():',
+'    log("=" * 60)',
+'    log("RENDER QUEUE STARTED")',
+'    log("=" * 60)',
+'',
+'    results = []  # (hip, rop, status)',
+'    queue_start = time.time()',
+'',
+'    for job in QUEUE:',
+'        hip_path = job["hip"]',
+'        log("")',
+'        log(f"Loading hip file: {hip_path}")',
+'',
+'        try:',
+'            # suppress_save_prompt avoids hangs on unsaved-changes dialogs',
+'            hou.hipFile.load(hip_path, suppress_save_prompt=True,',
+'                             ignore_load_warnings=True)',
+'        except hou.LoadWarning as w:',
+'            log(f"  Load warning (continuing): {w}")',
+'        except Exception:',
+'            log(f"  COULD NOT LOAD: {hip_path} -- skipping its ROPs")',
+'            log(traceback.format_exc())',
+'            for rop_path in job["rops"]:',
+'                results.append((hip_path, rop_path, "hip load failed"))',
+'            continue',
+'',
+'        for rop_path in job["rops"]:',
+'            status = render_rop(rop_path)',
+'            results.append((hip_path, rop_path, status))',
+'',
+'    # ------------------ summary ------------------',
+'    log("")',
+'    log("=" * 60)',
+'    log(f"QUEUE FINISHED  (total: {fmt_duration(time.time() - queue_start)})")',
+'    log("=" * 60)',
+'    ok = sum(1 for r in results if r[2] == "ok")',
+'    log(f"{ok}/{len(results)} ROPs rendered successfully")',
+'    for hip_path, rop_path, status in results:',
+'        marker = "OK    " if status == "ok" else status.upper()',
+'        log(f"  [{marker}] {hip_path}  ->  {rop_path}")',
+'    log("")',
+'',
+'',
+'if __name__ == "__main__":',
+'    main()',
+''
+].join('\n');
+  }
+
+  function buildBat(cfg){
+    return [
+'@echo off',
+'REM -- Generated by Render Queue Generator --',
+'set HYTHON="C:\\Program Files\\Side Effects Software\\Houdini ' + cfg.version + '\\bin\\hython.exe"',
+'',
+'set SCRIPT="' + cfg.folder + '\\render_queue.py"',
+'',
+'if not exist %HYTHON% (',
+'    echo ERROR: hython not found at %HYTHON%',
+'    echo Check the Houdini version folder in "C:\\Program Files\\Side Effects Software\\"',
+'    pause',
+'    exit /b 1',
+')',
+'if not exist %SCRIPT% (',
+'    echo ERROR: render_queue.py not found at %SCRIPT%',
+'    echo Save render_queue.py into that folder, or fix the SCRIPT path in this .bat',
+'    pause',
+'    exit /b 1',
+')',
+'',
+'echo Starting render queue...',
+'%HYTHON% %SCRIPT%',
+'',
+'echo.',
+'echo Queue finished. Check render_queue_log.txt in the same folder for the summary.',
+'pause',
+''
+].join('\r\n');
+  }
+
+  /* ---------------- download + preview ---------------- */
+
+  function download(name, text){
+    var blob = new Blob([text], {type:'text/plain'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+  }
+
+  function run(kind){
+    okmsg.classList.remove('show');
+    var cfg = collect();
+    problems.innerHTML = '';
+    if(cfg.errs.length){
+      cfg.errs.forEach(function(e){
+        var d = document.createElement('div'); d.textContent = e; problems.appendChild(d);
+      });
+      problems.classList.add('show');
+      return;
+    }
+    problems.classList.remove('show');
+
+    var py  = buildPy(cfg);
+    var bat = buildBat(cfg);
+
+    if(kind==='py'  || kind==='both') download('render_queue.py', py);
+    if(kind==='bat' || kind==='both') setTimeout(function(){ download('start_render_queue.bat', bat); }, kind==='both'?350:0);
+
+    okmsg.classList.add('show');
+    updatePreview();
+  }
+
+  document.getElementById('dlBoth').addEventListener('click', function(){ run('both'); });
+  document.getElementById('dlPy').addEventListener('click',  function(){ run('py'); });
+  document.getElementById('dlBat').addEventListener('click', function(){ run('bat'); });
+
+  function updatePreview(){
+    var cfg = collect();
+    if(cfg.errs.length){ previewPre.textContent = 'Fix the warnings above to see the preview.'; return; }
+    previewPre.textContent = (activeTab==='py') ? buildPy(cfg) : buildBat(cfg);
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.ptab'), function(t){
+    t.addEventListener('click', function(){
+      Array.prototype.forEach.call(document.querySelectorAll('.ptab'), function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      activeTab = t.getAttribute('data-tab');
+      updatePreview();
+    });
+  });
+  previewBox.addEventListener('toggle', function(){ if(previewBox.open) updatePreview(); });
+})();
+</script>
+</body>
+</html>

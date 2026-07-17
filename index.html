@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Render Queue Generator</title>
+<title>GUI Render Queue Generator</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#16191d;            /* houdini network editor dark */
+    --bg:#16191d;
     --panel:#1e2228;
     --panel-2:#242a31;
     --line:#343c45;
     --text:#d8dde2;
     --muted:#7f8a94;
-    --rs:#ff5533;            /* redshift ember */
+    --rs:#ff5533;
     --rs-dim:#b33a24;
     --ok:#7fc97a;
     --warn:#e8b84b;
@@ -27,13 +27,12 @@
 
   .wrap{max-width:880px;margin:0 auto;padding:32px 20px 80px}
 
-  /* header styled like a ROP node header bar */
   header{display:flex;align-items:center;gap:14px;margin-bottom:6px}
   .node-badge{
     width:44px;height:44px;border-radius:8px;flex:none;
     background:linear-gradient(145deg,var(--rs),var(--rs-dim));
     display:flex;align-items:center;justify-content:center;
-    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:#1a0d09;
+    font-family:'JetBrains Mono',monospace;font-weight:700;font-size:11px;color:#1a0d09;
     box-shadow:0 0 0 1px rgba(255,85,51,.35), 0 4px 18px rgba(255,85,51,.18);
   }
   h1{font-size:22px;font-weight:700;letter-spacing:.01em}
@@ -44,28 +43,31 @@
   legend{padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 
   label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px}
-  label:first-of-type{margin-top:0}
-  input[type=text]{
+  input[type=text],input[type=number]{
     width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;
     color:var(--text);padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12.5px;
     outline:none;transition:border-color .15s;
   }
-  input[type=text]:focus{border-color:var(--rs)}
-  input[type=text]::placeholder{color:#4d5761}
+  input:focus{border-color:var(--rs)}
+  input::placeholder{color:#4d5761}
   .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
   .hint .mono{color:#9aa5af}
 
-  /* jobs as chained node cards */
+  .frames-row{display:flex;gap:10px}
+  .frames-row > div{flex:1}
+  .frames-row label{margin-top:12px}
+
   .queue{position:relative}
   .job{
     position:relative;background:var(--panel);border:1px solid var(--line);
     border-left:4px solid var(--rs);border-radius:var(--radius);
-    padding:14px 16px 16px;margin-bottom:0;
+    padding:14px 16px 16px;
   }
   .job + .wire{width:2px;height:20px;background:var(--node-wire);margin:0 auto}
   .job-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
   .job-idx{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rs);letter-spacing:.1em}
   .job-title{font-size:13px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace}
+  .job-frames-tag{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted)}
   .job-btns{display:flex;gap:6px}
   .icon-btn{
     background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
@@ -84,7 +86,10 @@
   .add-job:hover{border-color:var(--rs);color:var(--rs)}
   .add-job:focus-visible{outline:2px solid var(--rs);outline-offset:2px}
 
-  /* generate section */
+  .check-row{display:flex;align-items:center;gap:8px;margin-top:14px}
+  .check-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--rs);cursor:pointer}
+  .check-row label{margin:0;cursor:pointer;color:var(--text);font-size:13px}
+
   .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
   .btn{
     padding:12px 22px;border-radius:5px;border:none;cursor:pointer;
@@ -103,26 +108,28 @@
   .okmsg{margin-top:14px;font-size:13px;color:var(--ok);display:none}
   .okmsg.show{display:block}
 
-  /* preview */
   details{margin-top:26px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel)}
   summary{cursor:pointer;padding:12px 16px;font-size:13px;color:var(--muted);user-select:none}
   summary:hover{color:var(--text)}
-  .preview-tabs{display:flex;gap:0;border-top:1px solid var(--line)}
-  .ptab{flex:none;padding:8px 18px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent}
-  .ptab.active{color:var(--rs);border-bottom-color:var(--rs)}
   pre{
     padding:16px;overflow:auto;max-height:420px;font-family:'JetBrains Mono',monospace;
     font-size:11.5px;line-height:1.55;color:#b9c2cb;background:var(--bg);
-    border-radius:0 0 var(--radius) var(--radius);white-space:pre;
+    border-radius:0 0 var(--radius) var(--radius);white-space:pre;border-top:1px solid var(--line);
   }
 
-  footer{margin-top:34px;color:var(--muted);font-size:12px;line-height:1.7}
-  footer .mono{color:#9aa5af;font-size:11.5px}
+  .howto{margin-top:26px;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:16px 18px}
+  .howto h2{font-size:13px;font-family:'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .howto ol{margin-left:18px;font-size:13.5px;color:var(--text)}
+  .howto li{margin-bottom:6px}
+  .howto .mono{color:#9aa5af;font-size:12.5px}
+
+  footer{margin-top:30px;color:var(--muted);font-size:12px;line-height:1.7}
 
   @media (max-width:560px){
     .wrap{padding:20px 12px 60px}
     .actions{flex-direction:column}
     .btn{width:100%}
+    .frames-row{flex-direction:column;gap:0}
   }
   @media (prefers-reduced-motion: reduce){
     *{transition:none !important}
@@ -133,21 +140,22 @@
 <div class="wrap">
 
   <header>
-    <div class="node-badge">ROP</div>
-    <h1>Render Queue Generator</h1>
+    <div class="node-badge">GUI</div>
+    <h1>GUI Render Queue Generator</h1>
   </header>
-  <p class="sub">Fill in the paths, get a ready-to-run <span class="mono">render_queue.py</span> + <span class="mono">start_render_queue.bat</span>. Save both into the folder you set below, then double-click the .bat on the render PC.</p>
+  <p class="sub">Builds a <span class="mono">render_queue_GUI.py</span> to paste into Houdini's <span class="mono">Python Source Editor</span>. Runs on your normal interactive license — no hython, no hbatch — with per-scene frame ranges.</p>
 
   <fieldset>
-    <legend>Machine setup</legend>
+    <legend>Setup</legend>
 
-    <label for="houVersion">Houdini version on the render PC</label>
-    <input type="text" id="houVersion" value="20.5.654" spellcheck="false">
-    <p class="hint">Check the folder name in <span class="mono">C:\Program Files\Side Effects Software\</span> — e.g. <span class="mono">Houdini 20.5.654</span> → enter <span class="mono">20.5.654</span></p>
+    <label for="logFolder">Folder for the log file (<span class="mono">render_queue_log.txt</span>)</label>
+    <input type="text" id="logFolder" value="D:\TALAL\260722_Jerash Jerash Festival IJordan" spellcheck="false">
+    <p class="hint">Progress is written here live — open it in Notepad while Houdini is frozen to check on the queue.</p>
 
-    <label for="scriptFolder">Folder where you will save these two files</label>
-    <input type="text" id="scriptFolder" value="D:\TALAL\260722_Jerash Jerash Festival IJordan" spellcheck="false">
-    <p class="hint">The .bat looks for the .py here, and the log file <span class="mono">render_queue_log.txt</span> is written here too.</p>
+    <div class="check-row">
+      <input type="checkbox" id="ropRangeChk">
+      <label for="ropRangeChk">Ignore the frame fields — use each ROP's own saved frame range instead</label>
+    </div>
   </fieldset>
 
   <fieldset>
@@ -157,27 +165,31 @@
   </fieldset>
 
   <div class="actions">
-    <button class="btn btn-primary" id="dlBoth" type="button">Download .py + .bat</button>
-    <button class="btn btn-ghost" id="dlPy" type="button">Only .py</button>
-    <button class="btn btn-ghost" id="dlBat" type="button">Only .bat</button>
+    <button class="btn btn-primary" id="dlPy" type="button">Download render_queue_GUI.py</button>
+    <button class="btn btn-ghost" id="copyPy" type="button">Copy script to clipboard</button>
   </div>
   <div class="problems" id="problems"></div>
-  <div class="okmsg" id="okmsg">Files downloaded — move them to the folder above on the render PC.</div>
+  <div class="okmsg" id="okmsg"></div>
+
+  <div class="howto">
+    <h2>How to run it</h2>
+    <ol>
+      <li>Open Houdini normally on the render PC (save any open work first!)</li>
+      <li>Windows menu → <span class="mono">Python Source Editor</span></li>
+      <li>Paste the whole script, press <span class="mono">Apply</span></li>
+      <li>Houdini freezes while rendering — that's normal. Watch <span class="mono">render_queue_log.txt</span> or the output folders for progress. A summary dialog pops up when everything is done.</li>
+    </ol>
+  </div>
 
   <details id="previewBox">
-    <summary>Preview generated files</summary>
-    <div class="preview-tabs">
-      <button class="ptab active" data-tab="py" type="button">render_queue.py</button>
-      <button class="ptab" data-tab="bat" type="button">start_render_queue.bat</button>
-    </div>
+    <summary>Preview generated script</summary>
     <pre id="previewPre"></pre>
   </details>
 
   <footer>
-    Reminders before an overnight run:<br>
-    · Do a 1–2 frame test render of one ROP through the queue first.<br>
-    · Check each ROP's output path — files from different scenes must not overwrite each other.<br>
-    · <span class="mono">.hipnc</span> (Apprentice) caps third-party renders at 1280×720 with a watermark; Indie files are <span class="mono">.hiplc</span>.
+    · Test with a small range first (e.g. 0–2) to confirm each scene renders.<br>
+    · Check ROP output paths so scenes don't overwrite each other's frames.<br>
+    · Don't click the frozen Houdini window — it's rendering, not crashed.
   </footer>
 </div>
 
@@ -188,17 +200,18 @@
   var okmsg     = document.getElementById('okmsg');
   var previewPre= document.getElementById('previewPre');
   var previewBox= document.getElementById('previewBox');
-  var activeTab = 'py';
+  var ropRangeChk = document.getElementById('ropRangeChk');
 
   /* ---------------- job rows ---------------- */
 
-  function jobRow(hip, rops){
+  function jobRow(hip, rops, f0, f1, step){
     var d = document.createElement('div');
     d.className = 'job';
     d.innerHTML =
       '<div class="job-head">' +
         '<span class="job-idx"></span>' +
         '<span class="job-title mono"></span>' +
+        '<span class="job-frames-tag"></span>' +
         '<span class="job-btns">' +
           '<button class="icon-btn up"   type="button" title="Move up"   aria-label="Move up">▲</button>' +
           '<button class="icon-btn down" type="button" title="Move down" aria-label="Move down">▼</button>' +
@@ -208,18 +221,32 @@
       '<label>Hip file full path</label>' +
       '<input type="text" class="hip" spellcheck="false" placeholder="D:\\TALAL\\project\\SC01-HIP\\SC01.hipnc">' +
       '<label>ROP node paths — separate several with commas</label>' +
-      '<input type="text" class="rops" spellcheck="false" placeholder="/out/Redshift_ROP1">';
+      '<input type="text" class="rops" spellcheck="false" placeholder="/out/Redshift_ROP1">' +
+      '<div class="frames-row">' +
+        '<div><label>Start frame</label><input type="number" class="f0" step="1"></div>' +
+        '<div><label>End frame</label><input type="number" class="f1" step="1"></div>' +
+        '<div><label>Step (1 = every frame)</label><input type="number" class="fstep" step="1" min="1"></div>' +
+      '</div>';
 
-    d.querySelector('.hip').value  = hip  || '';
-    d.querySelector('.rops').value = rops || '/out/Redshift_ROP1';
+    d.querySelector('.hip').value   = hip  || '';
+    d.querySelector('.rops').value  = rops || '/out/Redshift_ROP1';
+    d.querySelector('.f0').value    = (f0   !== undefined) ? f0   : 0;
+    d.querySelector('.f1').value    = (f1   !== undefined) ? f1   : 650;
+    d.querySelector('.fstep').value = (step !== undefined) ? step : 1;
 
     d.querySelector('.del').addEventListener('click', function(){
       if(queueEl.querySelectorAll('.job').length > 1){ removeRow(d); renumber(); }
-      else { d.querySelector('.hip').value=''; d.querySelector('.rops').value='/out/Redshift_ROP1'; renumber(); }
+      else {
+        d.querySelector('.hip').value=''; d.querySelector('.rops').value='/out/Redshift_ROP1';
+        d.querySelector('.f0').value=0; d.querySelector('.f1').value=650; d.querySelector('.fstep').value=1;
+        renumber();
+      }
     });
     d.querySelector('.up').addEventListener('click', function(){ moveRow(d,-1); });
     d.querySelector('.down').addEventListener('click', function(){ moveRow(d, 1); });
-    d.querySelector('.hip').addEventListener('input', renumber);
+    ['hip','f0','f1','fstep'].forEach(function(c){
+      d.querySelector('.'+c).addEventListener('input', renumber);
+    });
     return d;
   }
 
@@ -259,26 +286,39 @@
       var hip = r.querySelector('.hip').value.trim();
       var name = hip ? hip.split('\\').pop() : 'untitled';
       r.querySelector('.job-title').textContent = name;
+      var f0 = r.querySelector('.f0').value, f1 = r.querySelector('.f1').value, st = r.querySelector('.fstep').value;
+      var tag = 'f ' + f0 + '\u2013' + f1;
+      if(String(st) !== '1' && st !== '') tag += ' /' + st;
+      r.querySelector('.job-frames-tag').textContent = ropRangeChk.checked ? 'ROP range' : tag;
     });
   }
   function pad(n){ return (n<10?'0':'')+n; }
 
-  function addJob(hip, rops){
-    var r = jobRow(hip, rops);
+  function addJob(hip, rops, f0, f1, step){
+    var r = jobRow(hip, rops, f0, f1, step);
     queueEl.appendChild(r);
     rebuildWires(); renumber();
     return r;
   }
 
   /* seed with the current project */
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC01-HIP\\SC01.hipnc');
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Lower.hipnc');
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_PTS.hipnc');
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Upper.hipnc');
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC01-HIP\\SC01.hipnc',        '/out/Redshift_ROP1', 0, 650, 1);
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Lower.hipnc',  '/out/Redshift_ROP1', 0, 650, 1);
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_PTS.hipnc',    '/out/Redshift_ROP1', 0, 650, 1);
+  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Upper.hipnc',  '/out/Redshift_ROP1', 0, 650, 1);
 
   document.getElementById('addJob').addEventListener('click', function(){
     var r = addJob('');
     r.querySelector('.hip').focus();
+  });
+
+  ropRangeChk.addEventListener('change', function(){
+    rows().forEach(function(r){
+      ['f0','f1','fstep'].forEach(function(c){
+        r.querySelector('.'+c).disabled = ropRangeChk.checked;
+      });
+    });
+    renumber();
   });
 
   /* ---------------- validation + collection ---------------- */
@@ -287,42 +327,57 @@
 
   function collect(){
     var errs = [];
-    var version = document.getElementById('houVersion').value.trim();
-    var folder  = clean(document.getElementById('scriptFolder').value);
+    var folder  = clean(document.getElementById('logFolder').value);
+    var useRopRange = ropRangeChk.checked;
 
-    if(!version) errs.push('Houdini version is empty.');
-    if(!folder)  errs.push('Save folder is empty.');
-    if(folder && !/^[A-Za-z]:\\/.test(folder)) errs.push('Save folder should be a full Windows path like D:\\TALAL\\project');
+    if(!folder)  errs.push('Log folder is empty.');
+    if(folder && !/^[A-Za-z]:\\/.test(folder)) errs.push('Log folder should be a full Windows path like D:\\TALAL\\project');
 
     var jobs = [];
     rows().forEach(function(r,i){
       var hip = clean(r.querySelector('.hip').value);
       var ropsRaw = r.querySelector('.rops').value.trim();
-      if(!hip && !ropsRaw) return;                    // fully empty row: skip silently
+      if(!hip && !ropsRaw) return;
       if(!hip){ errs.push('Job '+pad(i+1)+': hip file path is empty.'); return; }
       if(!/^[A-Za-z]:\\/.test(hip)) errs.push('Job '+pad(i+1)+': hip path should start with a drive letter, e.g. D:\\...');
       if(!/\.(hip|hipnc|hiplc)$/i.test(hip)) errs.push('Job '+pad(i+1)+': path does not end in .hip / .hipnc / .hiplc');
       if(/["']/.test(hip)) errs.push('Job '+pad(i+1)+': remove quote characters from the path.');
+
+      var n0 = null, n1 = null, ns = 1;
+      if(!useRopRange){
+        var f0 = r.querySelector('.f0').value.trim();
+        var f1 = r.querySelector('.f1').value.trim();
+        var st = r.querySelector('.fstep').value.trim();
+        if(f0==='' || f1==='') errs.push('Job '+pad(i+1)+': start and end frames are required.');
+        n0 = parseInt(f0,10); n1 = parseInt(f1,10); ns = st===''?1:parseInt(st,10);
+        if(!isNaN(n0) && !isNaN(n1) && n1 < n0) errs.push('Job '+pad(i+1)+': end frame is before start frame.');
+        if(isNaN(ns) || ns < 1){ errs.push('Job '+pad(i+1)+': step must be 1 or higher.'); ns = 1; }
+      }
 
       var rops = ropsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
       if(!rops.length){ rops = ['/out/Redshift_ROP1']; }
       rops.forEach(function(rp){
         if(rp[0] !== '/') errs.push('Job '+pad(i+1)+': ROP path "'+rp+'" should start with /out/');
       });
-      jobs.push({hip:hip, rops:rops});
+      jobs.push({hip:hip, rops:rops, f0:n0, f1:n1, step:ns});
     });
 
     if(!jobs.length) errs.push('The queue is empty — add at least one hip file.');
-    return {version:version, folder:folder, jobs:jobs, errs:errs};
+    return {folder:folder, useRopRange:useRopRange, jobs:jobs, errs:errs};
   }
 
-  /* ---------------- file generation ---------------- */
+  /* ---------------- script generation ---------------- */
 
   function buildPy(cfg){
     var q = '';
     cfg.jobs.forEach(function(j){
       q += '    {\n';
       q += '        "hip": r"' + j.hip + '",\n';
+      if(!cfg.useRopRange){
+        q += '        "frames": (' + j.f0 + ', ' + j.f1 + ', ' + j.step + '),\n';
+      } else {
+        q += '        "frames": None,  # use the ROP\'s saved range\n';
+      }
       q += '        "rops": [\n';
       j.rops.forEach(function(rp){ q += '            "' + rp + '",\n'; });
       q += '        ],\n';
@@ -331,8 +386,16 @@
 
     return [
 '"""',
-'Houdini / Redshift multi-file render queue',
-'Generated by Render Queue Generator -- run via start_render_queue.bat',
+'Houdini / Redshift multi-file render queue -- GUI version',
+'Runs INSIDE Houdini (no hython / batch license needed).',
+'Generated by GUI Render Queue Generator.',
+'',
+'How to run:',
+'  1. Open Houdini normally (SAVE any open work first!)',
+'  2. Windows menu > Python Source Editor',
+'  3. Paste this whole script, press Apply',
+'  4. Houdini freezes while rendering -- that is normal.',
+'     Check the log file in Notepad for live progress.',
 '"""',
 '',
 'import hou',
@@ -341,8 +404,8 @@
 'from datetime import datetime',
 '',
 '# ---------------------------------------------------------------',
-'# Render queue: each entry = one hip file + its ROPs,',
-'# rendered in the order listed.',
+'# "frames": (start, end, step)  -- overrides the ROP\'s saved range',
+'# "frames": None                -- uses the ROP\'s saved range',
 '# ---------------------------------------------------------------',
 'QUEUE = [',
 q.replace(/\n$/,''),
@@ -356,7 +419,7 @@ q.replace(/\n$/,''),
 'def log(msg):',
 '    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")',
 '    line = f"[{stamp}] {msg}"',
-'    print(line, flush=True)',
+'    print(line)',
 '    try:',
 '        with open(LOG_FILE, "a", encoding="utf-8") as f:',
 '            f.write(line + "\\n")',
@@ -370,16 +433,24 @@ q.replace(/\n$/,''),
 '    return f"{h:02d}:{m:02d}:{s:02d}"',
 '',
 '',
-'def render_rop(rop_path):',
+'def render_rop(rop_path, frames):',
 '    rop = hou.node(rop_path)',
 '    if rop is None:',
 '        log(f"  SKIPPED (not found): {rop_path}")',
 '        return "missing"',
 '',
-'    log(f"  Rendering: {rop_path}")',
+'    if frames is None:',
+'        log(f"  Rendering: {rop_path}  (ROP\'s saved frame range)")',
+'    else:',
+'        log(f"  Rendering: {rop_path}  frames {frames[0]}-{frames[1]}"',
+'            + (f" step {frames[2]}" if frames[2] != 1 else ""))',
 '    t0 = time.time()',
 '    try:',
-'        rop.render(verbose=True, output_progress=True)',
+'        if frames is None:',
+'            rop.render(verbose=False, output_progress=False)',
+'        else:',
+'            rop.render(frame_range=frames,',
+'                       verbose=False, output_progress=False)',
 '        log(f"  DONE: {rop_path}  ({fmt_duration(time.time() - t0)})")',
 '        return "ok"',
 '    except hou.OperationFailed as e:',
@@ -391,21 +462,21 @@ q.replace(/\n$/,''),
 '        return "failed"',
 '',
 '',
-'def main():',
+'def run_queue():',
 '    log("=" * 60)',
-'    log("RENDER QUEUE STARTED")',
+'    log("RENDER QUEUE STARTED (GUI mode)")',
 '    log("=" * 60)',
 '',
-'    results = []  # (hip, rop, status)',
+'    results = []',
 '    queue_start = time.time()',
 '',
 '    for job in QUEUE:',
 '        hip_path = job["hip"]',
+'        frames = job.get("frames")',
 '        log("")',
 '        log(f"Loading hip file: {hip_path}")',
 '',
 '        try:',
-'            # suppress_save_prompt avoids hangs on unsaved-changes dialogs',
 '            hou.hipFile.load(hip_path, suppress_save_prompt=True,',
 '                             ignore_load_warnings=True)',
 '        except hou.LoadWarning as w:',
@@ -418,10 +489,9 @@ q.replace(/\n$/,''),
 '            continue',
 '',
 '        for rop_path in job["rops"]:',
-'            status = render_rop(rop_path)',
+'            status = render_rop(rop_path, frames)',
 '            results.append((hip_path, rop_path, status))',
 '',
-'    # ------------------ summary ------------------',
 '    log("")',
 '    log("=" * 60)',
 '    log(f"QUEUE FINISHED  (total: {fmt_duration(time.time() - queue_start)})")',
@@ -433,45 +503,17 @@ q.replace(/\n$/,''),
 '        log(f"  [{marker}] {hip_path}  ->  {rop_path}")',
 '    log("")',
 '',
+'    hou.ui.displayMessage(',
+'        f"Render queue finished.\\n{ok}/{len(results)} ROPs OK.\\n"',
+'        f"See render_queue_log.txt for details.")',
 '',
-'if __name__ == "__main__":',
-'    main()',
+'',
+'run_queue()',
 ''
 ].join('\n');
   }
 
-  function buildBat(cfg){
-    return [
-'@echo off',
-'REM -- Generated by Render Queue Generator --',
-'set HYTHON="C:\\Program Files\\Side Effects Software\\Houdini ' + cfg.version + '\\bin\\hython.exe"',
-'',
-'set SCRIPT="' + cfg.folder + '\\render_queue.py"',
-'',
-'if not exist %HYTHON% (',
-'    echo ERROR: hython not found at %HYTHON%',
-'    echo Check the Houdini version folder in "C:\\Program Files\\Side Effects Software\\"',
-'    pause',
-'    exit /b 1',
-')',
-'if not exist %SCRIPT% (',
-'    echo ERROR: render_queue.py not found at %SCRIPT%',
-'    echo Save render_queue.py into that folder, or fix the SCRIPT path in this .bat',
-'    pause',
-'    exit /b 1',
-')',
-'',
-'echo Starting render queue...',
-'%HYTHON% %SCRIPT%',
-'',
-'echo.',
-'echo Queue finished. Check render_queue_log.txt in the same folder for the summary.',
-'pause',
-''
-].join('\r\n');
-  }
-
-  /* ---------------- download + preview ---------------- */
+  /* ---------------- download / copy / preview ---------------- */
 
   function download(name, text){
     var blob = new Blob([text], {type:'text/plain'});
@@ -483,7 +525,7 @@ q.replace(/\n$/,''),
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
   }
 
-  function run(kind){
+  function generate(){
     okmsg.classList.remove('show');
     var cfg = collect();
     problems.innerHTML = '';
@@ -492,38 +534,47 @@ q.replace(/\n$/,''),
         var d = document.createElement('div'); d.textContent = e; problems.appendChild(d);
       });
       problems.classList.add('show');
-      return;
+      return null;
     }
     problems.classList.remove('show');
-
-    var py  = buildPy(cfg);
-    var bat = buildBat(cfg);
-
-    if(kind==='py'  || kind==='both') download('render_queue.py', py);
-    if(kind==='bat' || kind==='both') setTimeout(function(){ download('start_render_queue.bat', bat); }, kind==='both'?350:0);
-
-    okmsg.classList.add('show');
-    updatePreview();
+    return buildPy(cfg);
   }
 
-  document.getElementById('dlBoth').addEventListener('click', function(){ run('both'); });
-  document.getElementById('dlPy').addEventListener('click',  function(){ run('py'); });
-  document.getElementById('dlBat').addEventListener('click', function(){ run('bat'); });
+  document.getElementById('dlPy').addEventListener('click', function(){
+    var py = generate();
+    if(py === null) return;
+    download('render_queue_GUI.py', py);
+    okmsg.textContent = 'Script downloaded — paste its contents into Houdini\u2019s Python Source Editor and press Apply.';
+    okmsg.classList.add('show');
+    updatePreview();
+  });
+
+  document.getElementById('copyPy').addEventListener('click', function(){
+    var py = generate();
+    if(py === null) return;
+    var done = function(okTxt){
+      okmsg.textContent = okTxt;
+      okmsg.classList.add('show');
+      updatePreview();
+    };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(py).then(function(){
+        done('Script copied — paste it into Houdini\u2019s Python Source Editor and press Apply.');
+      }, function(){
+        previewBox.open = true; updatePreview();
+        done('Could not access clipboard — the script is shown in the preview below, select and copy it manually.');
+      });
+    } else {
+      previewBox.open = true; updatePreview();
+      done('Clipboard unavailable — the script is shown in the preview below, select and copy it manually.');
+    }
+  });
 
   function updatePreview(){
     var cfg = collect();
     if(cfg.errs.length){ previewPre.textContent = 'Fix the warnings above to see the preview.'; return; }
-    previewPre.textContent = (activeTab==='py') ? buildPy(cfg) : buildBat(cfg);
+    previewPre.textContent = buildPy(cfg);
   }
-
-  Array.prototype.forEach.call(document.querySelectorAll('.ptab'), function(t){
-    t.addEventListener('click', function(){
-      Array.prototype.forEach.call(document.querySelectorAll('.ptab'), function(x){ x.classList.remove('active'); });
-      t.classList.add('active');
-      activeTab = t.getAttribute('data-tab');
-      updatePreview();
-    });
-  });
   previewBox.addEventListener('toggle', function(){ if(previewBox.open) updatePreview(); });
 })();
 </script>

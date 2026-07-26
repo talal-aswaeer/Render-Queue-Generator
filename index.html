@@ -43,7 +43,7 @@
   legend{padding:0 8px;font-family:'JetBrains Mono',monospace;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 
   label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 5px}
-  input[type=text],input[type=number]{
+  input[type=text]{
     width:100%;background:var(--bg);border:1px solid var(--line);border-radius:4px;
     color:var(--text);padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12.5px;
     outline:none;transition:border-color .15s;
@@ -52,10 +52,6 @@
   input::placeholder{color:#4d5761}
   .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
   .hint .mono{color:#9aa5af}
-
-  .frames-row{display:flex;gap:10px}
-  .frames-row > div{flex:1}
-  .frames-row label{margin-top:12px}
 
   .queue{position:relative}
   .job{
@@ -67,7 +63,6 @@
   .job-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
   .job-idx{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rs);letter-spacing:.1em}
   .job-title{font-size:13px;font-weight:500;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace}
-  .job-frames-tag{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--muted)}
   .job-btns{display:flex;gap:6px}
   .icon-btn{
     background:var(--panel-2);border:1px solid var(--line);color:var(--muted);
@@ -85,10 +80,6 @@
   }
   .add-job:hover{border-color:var(--rs);color:var(--rs)}
   .add-job:focus-visible{outline:2px solid var(--rs);outline-offset:2px}
-
-  .check-row{display:flex;align-items:center;gap:8px;margin-top:14px}
-  .check-row input[type=checkbox]{width:15px;height:15px;accent-color:var(--rs);cursor:pointer}
-  .check-row label{margin:0;cursor:pointer;color:var(--text);font-size:13px}
 
   .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px}
   .btn{
@@ -129,7 +120,6 @@
     .wrap{padding:20px 12px 60px}
     .actions{flex-direction:column}
     .btn{width:100%}
-    .frames-row{flex-direction:column;gap:0}
   }
   @media (prefers-reduced-motion: reduce){
     *{transition:none !important}
@@ -143,19 +133,14 @@
     <div class="node-badge">GUI</div>
     <h1>GUI Render Queue Generator</h1>
   </header>
-  <p class="sub">Builds a <span class="mono">render_queue_GUI.py</span> to paste into Houdini's <span class="mono">Python Source Editor</span>. Runs on your normal interactive license — no hython, no hbatch — with per-scene frame ranges.</p>
+  <p class="sub">Builds a <span class="mono">render_queue_GUI.py</span> to paste into Houdini's <span class="mono">Python Source Editor</span>. Runs on your normal interactive license — each ROP renders its own saved frame range.</p>
 
   <fieldset>
     <legend>Setup</legend>
 
     <label for="logFolder">Folder for the log file (<span class="mono">render_queue_log.txt</span>)</label>
-    <input type="text" id="logFolder" value="D:\TALAL\260722_Jerash Jerash Festival IJordan" spellcheck="false">
+    <input type="text" id="logFolder" value="" placeholder="D:\MyProject" spellcheck="false">
     <p class="hint">Progress is written here live — open it in Notepad while Houdini is frozen to check on the queue.</p>
-
-    <div class="check-row">
-      <input type="checkbox" id="ropRangeChk">
-      <label for="ropRangeChk">Ignore the frame fields — use each ROP's own saved frame range instead</label>
-    </div>
   </fieldset>
 
   <fieldset>
@@ -174,6 +159,7 @@
   <div class="howto">
     <h2>How to run it</h2>
     <ol>
+      <li>Set the frame range you want on each scene's ROP, and save the hip file</li>
       <li>Open Houdini normally on the render PC (save any open work first!)</li>
       <li>Windows menu → <span class="mono">Python Source Editor</span></li>
       <li>Paste the whole script, press <span class="mono">Apply</span></li>
@@ -187,7 +173,7 @@
   </details>
 
   <footer>
-    · Test with a small range first (e.g. 0–2) to confirm each scene renders.<br>
+    · Each ROP renders the frame range saved in its hip file — set it there before queuing.<br>
     · Check ROP output paths so scenes don't overwrite each other's frames.<br>
     · Don't click the frozen Houdini window — it's rendering, not crashed.
   </footer>
@@ -200,18 +186,16 @@
   var okmsg     = document.getElementById('okmsg');
   var previewPre= document.getElementById('previewPre');
   var previewBox= document.getElementById('previewBox');
-  var ropRangeChk = document.getElementById('ropRangeChk');
 
   /* ---------------- job rows ---------------- */
 
-  function jobRow(hip, rops, f0, f1, step){
+  function jobRow(hip, rops){
     var d = document.createElement('div');
     d.className = 'job';
     d.innerHTML =
       '<div class="job-head">' +
         '<span class="job-idx"></span>' +
         '<span class="job-title mono"></span>' +
-        '<span class="job-frames-tag"></span>' +
         '<span class="job-btns">' +
           '<button class="icon-btn up"   type="button" title="Move up"   aria-label="Move up">▲</button>' +
           '<button class="icon-btn down" type="button" title="Move down" aria-label="Move down">▼</button>' +
@@ -221,32 +205,23 @@
       '<label>Hip file full path</label>' +
       '<input type="text" class="hip" spellcheck="false" placeholder="D:\\TALAL\\project\\SC01-HIP\\SC01.hipnc">' +
       '<label>ROP node paths — separate several with commas</label>' +
-      '<input type="text" class="rops" spellcheck="false" placeholder="/out/Redshift_ROP1">' +
-      '<div class="frames-row">' +
-        '<div><label>Start frame</label><input type="number" class="f0" step="1"></div>' +
-        '<div><label>End frame</label><input type="number" class="f1" step="1"></div>' +
-        '<div><label>Step (1 = every frame)</label><input type="number" class="fstep" step="1" min="1"></div>' +
-      '</div>';
+      '<input type="text" class="rops" spellcheck="false" placeholder="/out/Redshift_ROP1">';
 
-    d.querySelector('.hip').value   = hip  || '';
-    d.querySelector('.rops').value  = rops || '/out/Redshift_ROP1';
-    d.querySelector('.f0').value    = (f0   !== undefined) ? f0   : 0;
-    d.querySelector('.f1').value    = (f1   !== undefined) ? f1   : 650;
-    d.querySelector('.fstep').value = (step !== undefined) ? step : 1;
+    d.querySelector('.hip').value  = hip  || '';
+    d.querySelector('.rops').value = rops || '/out/Redshift_ROP1';
+    attachSanitizer(d.querySelector('.rops'));
 
     d.querySelector('.del').addEventListener('click', function(){
       if(queueEl.querySelectorAll('.job').length > 1){ removeRow(d); renumber(); }
       else {
         d.querySelector('.hip').value=''; d.querySelector('.rops').value='/out/Redshift_ROP1';
-        d.querySelector('.f0').value=0; d.querySelector('.f1').value=650; d.querySelector('.fstep').value=1;
         renumber();
       }
     });
     d.querySelector('.up').addEventListener('click', function(){ moveRow(d,-1); });
     d.querySelector('.down').addEventListener('click', function(){ moveRow(d, 1); });
-    ['hip','f0','f1','fstep'].forEach(function(c){
-      d.querySelector('.'+c).addEventListener('input', renumber);
-    });
+    attachSanitizer(d.querySelector('.hip'));
+    d.querySelector('.hip').addEventListener('input', renumber);
     return d;
   }
 
@@ -286,51 +261,54 @@
       var hip = r.querySelector('.hip').value.trim();
       var name = hip ? hip.split('\\').pop() : 'untitled';
       r.querySelector('.job-title').textContent = name;
-      var f0 = r.querySelector('.f0').value, f1 = r.querySelector('.f1').value, st = r.querySelector('.fstep').value;
-      var tag = 'f ' + f0 + '\u2013' + f1;
-      if(String(st) !== '1' && st !== '') tag += ' /' + st;
-      r.querySelector('.job-frames-tag').textContent = ropRangeChk.checked ? 'ROP range' : tag;
     });
   }
   function pad(n){ return (n<10?'0':'')+n; }
 
-  function addJob(hip, rops, f0, f1, step){
-    var r = jobRow(hip, rops, f0, f1, step);
+  function addJob(hip, rops){
+    var r = jobRow(hip, rops);
     queueEl.appendChild(r);
     rebuildWires(); renumber();
     return r;
   }
 
-  /* seed with the current project */
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC01-HIP\\SC01.hipnc',        '/out/Redshift_ROP1', 0, 650, 1);
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Lower.hipnc',  '/out/Redshift_ROP1', 0, 650, 1);
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_PTS.hipnc',    '/out/Redshift_ROP1', 0, 650, 1);
-  addJob('D:\\TALAL\\260722_Jerash Jerash Festival IJordan\\SC02-HIP\\SC02_Upper.hipnc',  '/out/Redshift_ROP1', 0, 650, 1);
+  /* start with one empty job card */
+  addJob('');
+
+  attachSanitizer(document.getElementById('logFolder'));
 
   document.getElementById('addJob').addEventListener('click', function(){
     var r = addJob('');
     r.querySelector('.hip').focus();
   });
 
-  ropRangeChk.addEventListener('change', function(){
-    rows().forEach(function(r){
-      ['f0','f1','fstep'].forEach(function(c){
-        r.querySelector('.'+c).disabled = ropRangeChk.checked;
-      });
-    });
-    renumber();
-  });
-
   /* ---------------- validation + collection ---------------- */
 
-  function clean(p){ return p.trim().replace(/[\\\/]+$/,''); }
+  /* strips the quotes Windows "Copy as path" adds, plus other characters
+     that can never appear in a Windows path */
+  function sanitizePath(p){
+    return p
+      .replace(/["'\u201C\u201D\u2018\u2019]/g, '')  // straight + curly quotes
+      .replace(/[<>|?*]/g, '')                            // illegal path characters
+      .replace(/^\s+/, '');                              // leading whitespace
+  }
+  function attachSanitizer(inp){
+    inp.addEventListener('input', function(){
+      var v = sanitizePath(inp.value);
+      if(v !== inp.value){
+        var pos = inp.selectionStart - (inp.value.length - v.length);
+        inp.value = v;
+        if(pos >= 0){ try{ inp.setSelectionRange(pos, pos); }catch(e){} }
+      }
+    });
+  }
+  function clean(p){ return sanitizePath(p).trim().replace(/[\\\/]+$/,''); }
 
   function collect(){
     var errs = [];
-    var folder  = clean(document.getElementById('logFolder').value);
-    var useRopRange = ropRangeChk.checked;
+    var folder = clean(document.getElementById('logFolder').value);
 
-    if(!folder)  errs.push('Log folder is empty.');
+    if(!folder) errs.push('Log folder is empty.');
     if(folder && !/^[A-Za-z]:\\/.test(folder)) errs.push('Log folder should be a full Windows path like D:\\TALAL\\project');
 
     var jobs = [];
@@ -341,29 +319,17 @@
       if(!hip){ errs.push('Job '+pad(i+1)+': hip file path is empty.'); return; }
       if(!/^[A-Za-z]:\\/.test(hip)) errs.push('Job '+pad(i+1)+': hip path should start with a drive letter, e.g. D:\\...');
       if(!/\.(hip|hipnc|hiplc)$/i.test(hip)) errs.push('Job '+pad(i+1)+': path does not end in .hip / .hipnc / .hiplc');
-      if(/["']/.test(hip)) errs.push('Job '+pad(i+1)+': remove quote characters from the path.');
-
-      var n0 = null, n1 = null, ns = 1;
-      if(!useRopRange){
-        var f0 = r.querySelector('.f0').value.trim();
-        var f1 = r.querySelector('.f1').value.trim();
-        var st = r.querySelector('.fstep').value.trim();
-        if(f0==='' || f1==='') errs.push('Job '+pad(i+1)+': start and end frames are required.');
-        n0 = parseInt(f0,10); n1 = parseInt(f1,10); ns = st===''?1:parseInt(st,10);
-        if(!isNaN(n0) && !isNaN(n1) && n1 < n0) errs.push('Job '+pad(i+1)+': end frame is before start frame.');
-        if(isNaN(ns) || ns < 1){ errs.push('Job '+pad(i+1)+': step must be 1 or higher.'); ns = 1; }
-      }
 
       var rops = ropsRaw.split(',').map(function(s){return s.trim();}).filter(Boolean);
       if(!rops.length){ rops = ['/out/Redshift_ROP1']; }
       rops.forEach(function(rp){
         if(rp[0] !== '/') errs.push('Job '+pad(i+1)+': ROP path "'+rp+'" should start with /out/');
       });
-      jobs.push({hip:hip, rops:rops, f0:n0, f1:n1, step:ns});
+      jobs.push({hip:hip, rops:rops});
     });
 
     if(!jobs.length) errs.push('The queue is empty — add at least one hip file.');
-    return {folder:folder, useRopRange:useRopRange, jobs:jobs, errs:errs};
+    return {folder:folder, jobs:jobs, errs:errs};
   }
 
   /* ---------------- script generation ---------------- */
@@ -373,11 +339,6 @@
     cfg.jobs.forEach(function(j){
       q += '    {\n';
       q += '        "hip": r"' + j.hip + '",\n';
-      if(!cfg.useRopRange){
-        q += '        "frames": (' + j.f0 + ', ' + j.f1 + ', ' + j.step + '),\n';
-      } else {
-        q += '        "frames": None,  # use the ROP\'s saved range\n';
-      }
       q += '        "rops": [\n';
       j.rops.forEach(function(rp){ q += '            "' + rp + '",\n'; });
       q += '        ],\n';
@@ -388,6 +349,7 @@
 '"""',
 'Houdini / Redshift multi-file render queue -- GUI version',
 'Runs INSIDE Houdini (no hython / batch license needed).',
+'Each ROP renders the frame range saved in its hip file.',
 'Generated by GUI Render Queue Generator.',
 '',
 'How to run:',
@@ -403,9 +365,6 @@
 'import traceback',
 'from datetime import datetime',
 '',
-'# ---------------------------------------------------------------',
-'# "frames": (start, end, step)  -- overrides the ROP\'s saved range',
-'# "frames": None                -- uses the ROP\'s saved range',
 '# ---------------------------------------------------------------',
 'QUEUE = [',
 q.replace(/\n$/,''),
@@ -433,24 +392,16 @@ q.replace(/\n$/,''),
 '    return f"{h:02d}:{m:02d}:{s:02d}"',
 '',
 '',
-'def render_rop(rop_path, frames):',
+'def render_rop(rop_path):',
 '    rop = hou.node(rop_path)',
 '    if rop is None:',
 '        log(f"  SKIPPED (not found): {rop_path}")',
 '        return "missing"',
 '',
-'    if frames is None:',
-'        log(f"  Rendering: {rop_path}  (ROP\'s saved frame range)")',
-'    else:',
-'        log(f"  Rendering: {rop_path}  frames {frames[0]}-{frames[1]}"',
-'            + (f" step {frames[2]}" if frames[2] != 1 else ""))',
+'    log(f"  Rendering: {rop_path}  (ROP\'s saved frame range)")',
 '    t0 = time.time()',
 '    try:',
-'        if frames is None:',
-'            rop.render(verbose=False, output_progress=False)',
-'        else:',
-'            rop.render(frame_range=frames,',
-'                       verbose=False, output_progress=False)',
+'        rop.render(verbose=False, output_progress=False)',
 '        log(f"  DONE: {rop_path}  ({fmt_duration(time.time() - t0)})")',
 '        return "ok"',
 '    except hou.OperationFailed as e:',
@@ -472,7 +423,6 @@ q.replace(/\n$/,''),
 '',
 '    for job in QUEUE:',
 '        hip_path = job["hip"]',
-'        frames = job.get("frames")',
 '        log("")',
 '        log(f"Loading hip file: {hip_path}")',
 '',
@@ -489,7 +439,7 @@ q.replace(/\n$/,''),
 '            continue',
 '',
 '        for rop_path in job["rops"]:',
-'            status = render_rop(rop_path, frames)',
+'            status = render_rop(rop_path)',
 '            results.append((hip_path, rop_path, status))',
 '',
 '    log("")',
@@ -544,7 +494,7 @@ q.replace(/\n$/,''),
     var py = generate();
     if(py === null) return;
     download('render_queue_GUI.py', py);
-    okmsg.textContent = 'Script downloaded — paste its contents into Houdini\u2019s Python Source Editor and press Apply.';
+    okmsg.textContent = 'Script downloaded \u2014 paste its contents into Houdini\u2019s Python Source Editor and press Apply.';
     okmsg.classList.add('show');
     updatePreview();
   });
@@ -559,14 +509,14 @@ q.replace(/\n$/,''),
     };
     if(navigator.clipboard && navigator.clipboard.writeText){
       navigator.clipboard.writeText(py).then(function(){
-        done('Script copied — paste it into Houdini\u2019s Python Source Editor and press Apply.');
+        done('Script copied \u2014 paste it into Houdini\u2019s Python Source Editor and press Apply.');
       }, function(){
         previewBox.open = true; updatePreview();
-        done('Could not access clipboard — the script is shown in the preview below, select and copy it manually.');
+        done('Could not access clipboard \u2014 the script is shown in the preview below, select and copy it manually.');
       });
     } else {
       previewBox.open = true; updatePreview();
-      done('Clipboard unavailable — the script is shown in the preview below, select and copy it manually.');
+      done('Clipboard unavailable \u2014 the script is shown in the preview below, select and copy it manually.');
     }
   });
 
